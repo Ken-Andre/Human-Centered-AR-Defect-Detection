@@ -3,9 +3,8 @@ import os
 
 def main():
     detector = QRCodeDetector()
-    # Use a relative path from the project root
     image_path = os.path.join(os.path.dirname(__file__), "test_media", "qr_code_5.png")
-    
+
     try:
         qr_codes = detector.detect_from_image(image_path)
         if qr_codes:

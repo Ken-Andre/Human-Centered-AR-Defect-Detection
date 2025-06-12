@@ -1,11 +1,12 @@
 from flask import Flask, request, jsonify
 import cv2
+import numpy as np
 import pyzbar.pyzbar as pyzbar
 from ultralytics import YOLO
 
 app = Flask(__name__)
 model = YOLO("yolov8n.pt")
-server_ip = "192.168.1.100"  # À remplacer
+server_ip = "192.168.1.105"  # À remplacer
 port = "8080"
 
 @app.route('/stream', methods=['POST'])
