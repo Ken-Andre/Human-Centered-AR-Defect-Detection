@@ -1,0 +1,18 @@
+# Configuration pour l'entraînement YOLOv8n
+data: dataset/screw/dataset.yaml  # Chemin vers ton dataset YAML
+model: models/yolov8n.pt  # Modèle pré-entraîné de base
+epochs: 100  # Nombre d'epochs (ajustable)
+batch: 8  # Taille du batch (petite pour CPU)
+imgsz: 640  # Taille des images (réduite pour CPU)
+device: cpu  # Entraînement sur CPU
+workers: 0  # Pas de workers pour CPU
+cache: False  # Pas de cache pour éviter surcharge mémoire
+augment: True  # Activer l'augmentation de données
+mosaic: 1.0  # Probabilité d'utiliser la mosaïque
+perspective: 0.5  # Instead of rotate, use perspective distortion
+flipud: 0.5  # Probabilité de flip vertical
+fliplr: 0.5  # Probabilité de flip horizontal
+scale: 0.5   # Probabilité de zoom
+lr0: 0.001  # Taux d'apprentissage initial
+optimizer: AdamW  # Optimiseur recommandé
+patience: 20  # Arrêt anticipé après 10 epochs sans amélioration

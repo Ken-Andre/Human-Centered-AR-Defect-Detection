@@ -1,0 +1,7 @@
+path: dataset/screw/yolo_format
+train: images/train
+val: images/val
+test: images/val
+
+names:
+  0: defect

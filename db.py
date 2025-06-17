@@ -46,7 +46,18 @@ def init_db():
     if connection:
         cursor = connection.cursor()
         cursor.execute("""
-        """)
+                    CREATE TABLE IF NOT EXISTS equipment (
+                        id SERIAL PRIMARY KEY,
+                        serial_number VARCHAR(50) UNIQUE NOT NULL,
+                        equipment_name VARCHAR(100) NOT NULL,
+                        asset_id VARCHAR(50) NOT NULL,
+                        part_number VARCHAR(50) NOT NULL,
+                        location_name VARCHAR(100) NOT NULL,
+                        documentation TEXT DEFAULT 'Guide technique standard',
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
         connection.commit()
         cursor.close()
         connection.close()
