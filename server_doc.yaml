@@ -1,0 +1,224 @@
+openapi: 3.0.3
+info:
+  title: AR Assembly Detection API
+  version: 1.0.0
+  description: |
+    API pour la détection de défauts, identification et documentation des équipements industriels, en streaming temps réel (aucune persistance capteurs/détection).
+servers:
+  - url: http://127.0.0.1:5000
+
+paths:
+  /detect_defect:
+    post:
+      summary: Détecter un défaut sur une image
+      description: Envoie une image (multipart) pour détection de défaut par IA.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                image:
+                  type: string
+                  format: binary
+                  description: Image à analyser
+      responses:
+        '200':
+          description: Résultat de la détection
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  anomaly_score:
+                    type: number
+                  status:
+                    type: string
+                    enum: [GOOD, DEFECT]
+        '400':
+          description: Image manquante ou invalide
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /detect_qrcode:
+    post:
+      summary: Détecter un QR code sur une image
+      description: Envoie une image (multipart) pour détection de QR code.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                image:
+                  type: string
+                  format: binary
+                  description: Image à analyser
+      responses:
+        '200':
+          description: Résultat de la détection QR code
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  qr_code:
+                    type: string
+                  error:
+                    type: string
+        '400':
+          description: Image manquante ou invalide
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /health:
+    get:
+      summary: Vérification de santé du serveur
+      responses:
+        '200':
+          description: Statut du serveur et de ses dépendances
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  timestamp:
+                    type: string
+                  database:
+                    type: string
+                  ai_models:
+                    type: string
+                  version:
+                    type: string
+
+  /sensors/{serial_number}:
+    post:
+      summary: Recevoir les données capteurs pour un équipement
+      description: Les données sont simplement diffusées en temps réel via WebSocket, pas de persistance.
+      parameters:
+        - in: path
+          name: serial_number
+          required: true
+          schema:
+            type: string
+          description: Numéro de série de l'équipement concerné
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [temperature, vibration, timestamp]
+              properties:
+                temperature:
+                  type: number
+                vibration:
+                  type: number
+                timestamp:
+                  type: string
+      responses:
+        '200':
+          description: Accusé de réception du streaming capteur
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  timestamp:
+                    type: string
+        '400':
+          description: Champs capteurs manquants
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Erreur interne serveur
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /equipment/{serial_number}:
+    get:
+      summary: Obtenir les informations d'un équipement
+      parameters:
+        - in: path
+          name: serial_number
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Détails de l'équipement
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Equipment'
+        '404':
+          description: Équipement non trouvé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /equipment/{serial_number}/documentation:
+    get:
+      summary: Obtenir la documentation technique d'un équipement
+      parameters:
+        - in: path
+          name: serial_number
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Documentation de l'équipement
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  serial_number:
+                    type: string
+                  documentation:
+                    type: string
+        '404':
+          description: Équipement ou documentation non trouvée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    Equipment:
+      type: object
+      properties:
+        serial_number:
+          type: string
+        equipment_name:
+          type: string
+        asset_id:
+          type: string
+        part_number:
+          type: string
+        location_name:
+          type: string
+        documentation:
+          type: string
+    Error:
+      type: object
+      properties:
+        error:
+          type: string

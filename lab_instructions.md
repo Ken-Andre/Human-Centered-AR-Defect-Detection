@@ -103,12 +103,19 @@ conda install -y -c conda-forge ultralytics
 ```
 
 
+[//]: # (```bash)
+
+[//]: # (python run_patchcore.py --dataset_path ./dataset/patchcore/ --category screw \)
+
+[//]: # (  --method patchcore --save_segmentation_images --save_plots --device cpu)
+
+[//]: # (```)
+
+
+
 ```bash
-python run_patchcore.py --dataset_path ./dataset/patchcore/ --category screw \
-  --method patchcore --save_segmentation_images --save_plots --device cpu
+python -m server
 ```
-
-
 
 
 

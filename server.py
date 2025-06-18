@@ -1,41 +1,86 @@
 #!/usr/bin/env python3
 """
-Serveur principal pour le système AR Assembly Detection
-- Flask + WebSocket pour communications AR
-- PostgreSQL pour données équipements
-- Intégration modules de détection (QR + IA)
-- Réception données capteurs ESP32
+Serveur AR Assembly Detection (API, sans persistance capteurs/défauts)
+- Flask + WebSocket pour communications AR/ESP32
+- PostgreSQL pour gestion équipements SEULEMENT
+- Intégration détection IA (Autoencoder, QR)
 """
 
 from flask import Flask, request, jsonify
 from flask_socketio import SocketIO, emit
-import psycopg2
-import json
 import base64
 import cv2
 import numpy as np
-import logging
+from io import BytesIO
+from PIL import Image
 from datetime import datetime
+import logging
+
+import threading
+import sys
 import os
 
-# Imports modules de détection
-from detection_integree import DetectionManager
-from db import DatabaseManager
+from sudo_detection import DetectionManager
+from db import *
 
-# Configuration logging
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
 
-# Configuration Flask
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'ar_assembly_detection_2025'
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
-# Initialisation des managers
-db_manager = DatabaseManager()
-detection_manager = DetectionManager()
+# -- "db_manager" qui wrappe uniquement l'accès aux équipements --
+class DatabaseManager:
+    def test_connection(self):
+        try:
+            # Connexion directe
+            # from db import get_db_connection
+            conn = get_db_connection()
+            if conn is None:
+                logger.error("No DB connection could be established.")
+                return False
+            # Test trivial
+            cursor = conn.cursor()
+            cursor.execute("SELECT 1")
+            cursor.fetchone()
+            cursor.close()
+            conn.close()
+            return True
+        except Exception as e:
+            logger.error(f"DB connection test failed: {e}")
+            return False
 
-# Variables globales pour la session
+    def get_equipment_details(self, serial_number):
+        return get_equipment_details(serial_number)
+    def save_sensor_data(self, serial_number, data):
+        # Pas de persistance : on ne fait rien
+        # TODO: implement future persistence
+        return True
+    def save_detection_result(self, serial_number, detection_result):
+        # Pas de persistance : on ne fait rien
+        # TODO: implement future persistence
+        return True
+
+def hot_reload_listener():
+    """
+    Thread qui écoute l'entrée clavier, si 'r' ou 'R' est pressé, redémarre le script.
+    """
+    import time
+    while True:
+        try:
+            key = input("\nTape 'r' + Entrée pour redémarrer le serveur à chaud (hot-reload) : ")
+            if key.strip().lower() == 'r':
+                logger.info("[HOT-RELOAD] Restart demandé par l'utilisateur.")
+                # Redémarrage du script courant avec les mêmes arguments
+                os.execv(sys.executable, [sys.executable] + sys.argv)
+        except (EOFError, KeyboardInterrupt):
+            break
+        time.sleep(0.2)
+
+db_manager = DatabaseManager()
+analyzer = DetectionManager()
+
 current_session = {
     'equipment_id': None,
     'serial_number': None,
@@ -43,17 +88,37 @@ current_session = {
     'last_frame': None
 }
 
-# ==== ROUTES REST API ====
+def decode_image_from_request(req):
+    if 'image' not in req.files:
+        return None, "Missing image file"
+    file = req.files['image']
+    image_bytes = file.read()
+    image = Image.open(BytesIO(image_bytes)).convert("RGB")
+    return np.array(image), None
+
+# === ROUTES REST API ===
+
+@app.route("/detect_defect", methods=["POST"])
+def detect_defect_route():
+    frame, error = decode_image_from_request(request)
+    if error:
+        return jsonify({"error": error}), 400
+    result = analyzer.detect_defect(frame)
+    return jsonify(result)
+
+@app.route("/detect_qrcode", methods=["POST"])
+def detect_qrcode_route():
+    frame, error = decode_image_from_request(request)
+    if error:
+        return jsonify({"error": error}), 400
+    result = analyzer.detect_qrcode(frame)
+    return jsonify(result)
 
 @app.route('/health', methods=['GET'])
 def health_check():
-    """Vérification santé du serveur"""
     try:
-        # Test connexion DB
         db_status = db_manager.test_connection()
-        # Test modèles IA
-        ai_status = detection_manager.test_models()
-
+        ai_status = analyzer.test_models()
         return jsonify({
             'status': 'healthy',
             'timestamp': datetime.now().isoformat(),
@@ -67,37 +132,25 @@ def health_check():
 
 @app.route('/sensors/<serial_number>', methods=['POST'])
 def receive_sensor_data(serial_number):
-    """Réception données capteurs ESP32"""
+    """Réception données capteurs, stream temps réel seulement"""
     try:
         data = request.get_json()
-
-        # Validation des données
         required_fields = ['temperature', 'vibration', 'timestamp']
         if not all(field in data for field in required_fields):
             return jsonify({'error': 'Missing required sensor fields'}), 400
-
-        # Stockage en base
-        success = db_manager.save_sensor_data(serial_number, data)
-
-        if success:
-            # Diffusion temps réel via WebSocket
-            socketio.emit('sensor_data', {
-                'serial_number': serial_number,
-                'data': data
-            }, namespace='/sensors')
-
-            logger.info(f"Sensor data received for {serial_number}: T={data['temperature']}°C, V={data['vibration']}")
-            return jsonify({'status': 'success', 'timestamp': datetime.now().isoformat()})
-        else:
-            return jsonify({'error': 'Failed to save sensor data'}), 500
-
+        # Diffusion temps réel, pas de persistance !
+        socketio.emit('sensor_data', {
+            'serial_number': serial_number,
+            'data': data
+        }, namespace='/sensors')
+        logger.info(f"Sensor data streamed for {serial_number}: T={data['temperature']}°C, V={data['vibration']}")
+        return jsonify({'status': 'success', 'timestamp': datetime.now().isoformat()})
     except Exception as e:
         logger.error(f"Error receiving sensor data: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/equipment/<serial_number>', methods=['GET'])
 def get_equipment_info(serial_number):
-    """Récupération infos équipement"""
     try:
         equipment = db_manager.get_equipment_details(serial_number)
         if equipment:
@@ -108,80 +161,72 @@ def get_equipment_info(serial_number):
         logger.error(f"Error fetching equipment {serial_number}: {e}")
         return jsonify({'error': str(e)}), 500
 
-# ==== WEBSOCKET HANDLERS ====
+
+@app.route('/equipment/<serial_number>/documentation', methods=['GET'])
+def get_equipment_documentation(serial_number):
+    """
+    Retourne la documentation technique d'un équipement selon son serial_number.
+    """
+    try:
+        equipment = db_manager.get_equipment_details(serial_number)
+        if equipment and 'documentation' in equipment:
+            return jsonify({
+                'serial_number': serial_number,
+                'documentation': equipment['documentation']
+            })
+        elif equipment:
+            return jsonify({'error': 'No documentation found for this equipment'}), 404
+        else:
+            return jsonify({'error': 'Equipment not found'}), 404
+    except Exception as e:
+        logger.error(f"Error fetching documentation for {serial_number}: {e}")
+        return jsonify({'error': str(e)}), 500
+
+# === WEBSOCKET HANDLERS ===
 
 @socketio.on('connect')
 def handle_connect():
-    """Connexion client AR"""
-    logger.info(f"AR Client connected: {request.sid}")
+    logger.info(f"Client connected: {request.sid}")
     emit('connection_status', {'status': 'connected', 'session_id': request.sid})
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    """Déconnexion client AR"""
-    logger.info(f"AR Client disconnected: {request.sid}")
-    # Reset session
+    logger.info(f"Client disconnected: {request.sid}")
     global current_session
-    current_session = {
-        'equipment_id': None,
-        'serial_number': None,
-        'detection_active': False,
-        'last_frame': None
-    }
+    current_session = {'equipment_id': None, 'serial_number': None, 'detection_active': False, 'last_frame': None}
 
 @socketio.on('video_stream')
 def handle_video_stream(data):
-    """Réception flux vidéo continu AR"""
     try:
-        # Decode frame
         frame_data = base64.b64decode(data['frame'])
         frame = cv2.imdecode(np.frombuffer(frame_data, np.uint8), cv2.IMREAD_COLOR)
-
         if frame is None:
             emit('error', {'message': 'Failed to decode video frame'})
             return
-
-        # Stockage frame courante
         current_session['last_frame'] = frame
-
-        # Détection QR automatique si pas d'équipement identifié
         if not current_session['equipment_id']:
-            qr_result = detection_manager.detect_qr_code(frame)
-            if qr_result:
-                serial_number = qr_result.get('serial_number')
-                if serial_number:
-                    equipment = db_manager.get_equipment_details(serial_number)
-                    if equipment:
-                        current_session['equipment_id'] = equipment['id']
-                        current_session['serial_number'] = serial_number
-
-                        emit('equipment_identified', {
-                            'equipment': equipment,
-                            'qr_data': qr_result
-                        })
-                        logger.info(f"Equipment identified: {serial_number}")
-
-        # Confirmation réception stream
+            qr_result = analyzer.detect_qrcode(frame)
+            if qr_result and qr_result.get('qr_code'):
+                serial_number = qr_result['qr_code']
+                equipment = db_manager.get_equipment_details(serial_number)
+                if equipment:
+                    current_session['equipment_id'] = equipment['serial_number']
+                    current_session['serial_number'] = serial_number
+                    emit('equipment_identified', {'equipment': equipment, 'qr_data': qr_result})
+                    logger.info(f"Equipment identified: {serial_number}")
         emit('stream_status', {'status': 'received', 'timestamp': datetime.now().isoformat()})
-
     except Exception as e:
         logger.error(f"Error processing video stream: {e}")
         emit('error', {'message': f'Video processing error: {str(e)}'})
 
 @socketio.on('capture_frame')
 def handle_capture_frame(data):
-    """Capture frame pour détection (déclenchée par commande vocale)"""
     try:
         if current_session['last_frame'] is None:
             emit('error', {'message': 'No frame available for capture'})
             return
-
         frame = current_session['last_frame']
-
-        # Détection sur la frame capturée
-        detection_result = detection_manager.detect_defects(frame)
-
-        # Préparation résultat pour AR
+        detection_result = analyzer.detect_defect(frame)
         result = {
             'timestamp': datetime.now().isoformat(),
             'equipment_id': current_session['equipment_id'],
@@ -189,90 +234,13 @@ def handle_capture_frame(data):
             'detection': detection_result,
             'session_id': request.sid
         }
-
-        # Sauvegarde résultat en base
-        if current_session['serial_number']:
-            db_manager.save_detection_result(current_session['serial_number'], detection_result)
-
-        # Envoi résultat à AR
         emit('detection_result', result)
-
-        logger.info(f"Detection completed for {current_session['serial_number']}: {detection_result['status']}")
-
+        logger.info(f"Detection completed for {current_session['serial_number']}: {detection_result.get('status', 'unknown')}")
     except Exception as e:
         logger.error(f"Error during frame capture detection: {e}")
         emit('error', {'message': f'Detection error: {str(e)}'})
 
-@socketio.on('voice_command')
-def handle_voice_command(data):
-    """Traitement commandes vocales"""
-    try:
-        command = data.get('command', '').lower()
-
-        if command in ['capture', 'detect', 'analyser', 'scan']:
-            # Déclencher capture + détection
-            handle_capture_frame(data)
-
-        elif command in ['reset', 'nouveau', 'restart']:
-            # Reset session
-            global current_session
-            current_session = {
-                'equipment_id': None,
-                'serial_number': None,
-                'detection_active': False,
-                'last_frame': None
-            }
-            emit('session_reset', {'status': 'reset'})
-            logger.info("Session reset by voice command")
-
-        elif command in ['info', 'details', 'informations']:
-            # Informations équipement courant
-            if current_session['serial_number']:
-                equipment = db_manager.get_equipment_details(current_session['serial_number'])
-                emit('equipment_info', {'equipment': equipment})
-            else:
-                emit('error', {'message': 'No equipment identified'})
-
-        else:
-            emit('error', {'message': f'Unknown voice command: {command}'})
-
-    except Exception as e:
-        logger.error(f"Error processing voice command: {e}")
-        emit('error', {'message': f'Voice command error: {str(e)}'})
-
-@socketio.on('manual_detection')
-def handle_manual_detection(data):
-    """Détection manuelle déclenchée depuis AR"""
-    try:
-        # Récupération frame depuis data ou utilisation de la dernière
-        if 'frame' in data:
-            frame_data = base64.b64decode(data['frame'])
-            frame = cv2.imdecode(np.frombuffer(frame_data, np.uint8), cv2.IMREAD_COLOR)
-        else:
-            frame = current_session['last_frame']
-
-        if frame is None:
-            emit('error', {'message': 'No frame available for detection'})
-            return
-
-        # Détection complète
-        detection_result = detection_manager.full_detection_pipeline(frame)
-
-        # Envoi résultat
-        emit('detection_complete', {
-            'timestamp': datetime.now().isoformat(),
-            'result': detection_result,
-            'equipment_id': current_session['equipment_id']
-        })
-
-        logger.info(f"Manual detection completed: {detection_result['status']}")
-
-    except Exception as e:
-        logger.error(f"Error in manual detection: {e}")
-        emit('error', {'message': f'Manual detection error: {str(e)}'})
-
-# ==== GESTION DES ERREURS ====
-
+# --- Gestion erreurs ---
 @app.errorhandler(404)
 def not_found(error):
     return jsonify({'error': 'Endpoint not found'}), 404
@@ -286,26 +254,12 @@ def default_error_handler(e):
     logger.error(f"WebSocket error: {e}")
     emit('error', {'message': 'WebSocket communication error'})
 
-# ==== DÉMARRAGE SERVEUR ====
-
 def initialize_server():
-    """Initialisation du serveur"""
     logger.info("Initializing AR Assembly Detection Server...")
-
-    # Test connexion DB
-    if not db_manager.test_connection():
-        logger.error("Database connection failed!")
-        return False
-
-    # Test modèles IA
-    if not detection_manager.test_models():
-        logger.error("AI models loading failed!")
-        return False
-
-    logger.info("Server initialization completed successfully")
     return True
 
 if __name__ == '__main__':
+    # threading.Thread(target=hot_reload_listener, daemon=True).start()
     if initialize_server():
         logger.info("Starting AR Assembly Detection Server...")
         logger.info("Server endpoints:")
