@@ -262,9 +262,9 @@ def threshold_and_report(all_scores, out_csv="anomaly_scores.csv"):
 if __name__ == "__main__":
     print("=== AUTO-ENCODEUR DÉTECTION ANOMALIE PIPELINE ===")
     # 1. Préparation du dataset
-    prepare_ae_dataset(RAW_ROOT, AE_ROOT)
+    # prepare_ae_dataset(RAW_ROOT, AE_ROOT)
     # 2. Entraînement sur train/good
-    train_autoencoder(f"{AE_ROOT}/train/good")
+    # train_autoencoder(f"{AE_ROOT}/train/good")
     # 3. Test sur test/good et test/defect avec visu heatmap + scores
     all_scores = test_autoencoder("./models/autoencoder_screw.pt", f"{AE_ROOT}/test")
 
