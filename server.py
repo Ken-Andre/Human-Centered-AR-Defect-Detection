@@ -7,7 +7,7 @@ Serveur AR Assembly Detection (API, sans persistance capteurs/défauts)
 """
 
 from flask import Flask, request, jsonify
-from flask_socketio import SocketIO, emit
+from flask_socketio import SocketIO, join_room, leave_room, emit
 import base64
 import cv2
 import numpy as np
@@ -139,10 +139,15 @@ def receive_sensor_data(serial_number):
         if not all(field in data for field in required_fields):
             return jsonify({'error': 'Missing required sensor fields'}), 400
         # Diffusion temps réel, pas de persistance !
+        # socketio.emit('sensor_data', {
+        #     'serial_number': serial_number,
+        #     'data': data
+        # }, namespace='/sensors')
+        room = f"sensor_{serial_number}"
         socketio.emit('sensor_data', {
             'serial_number': serial_number,
             'data': data
-        }, namespace='/sensors')
+        }, room=room, namespace='/')
         logger.info(f"Sensor data streamed for {serial_number}: T={data['temperature']}°C, V={data['vibration']}")
         return jsonify({'status': 'success', 'timestamp': datetime.now().isoformat()})
     except Exception as e:
@@ -190,8 +195,8 @@ def handle_connect():
     emit('connection_status', {'status': 'connected', 'session_id': request.sid})
 
 @socketio.on('disconnect')
-def handle_disconnect():
-    logger.info(f"Client disconnected: {request.sid}")
+def handle_disconnect(sid):
+    logger.info(f"Client disconnected: {sid}")
     global current_session
     current_session = {'equipment_id': None, 'serial_number': None, 'detection_active': False, 'last_frame': None}
 
@@ -239,6 +244,46 @@ def handle_capture_frame(data):
     except Exception as e:
         logger.error(f"Error during frame capture detection: {e}")
         emit('error', {'message': f'Detection error: {str(e)}'})
+
+# Événement d'abonnement à un serial_number
+@socketio.on('subscribe_sensor', namespace='/')
+def subscribe_sensor(data):
+    serial_number = data.get('serial_number')
+    if not serial_number:
+        emit('subscription_status', {
+            'status': 'error',
+            'message': 'Missing serial_number'
+        }, to=request.sid)
+        return
+
+    # Ajouter le client à la room correspondante
+    room = f"sensor_{serial_number}"
+    join_room(room)
+    emit('subscription_status', {
+        'status': 'subscribed',
+        'serial_number': serial_number,
+        'message': f'Subscribed to sensor data for {serial_number}'
+    }, to=request.sid)
+
+# Événement de désabonnement
+@socketio.on('unsubscribe_sensor', namespace='/')
+def unsubscribe_sensor(data):
+    serial_number = data.get('serial_number')
+    if not serial_number:
+        emit('subscription_status', {
+            'status': 'error',
+            'message': 'Missing serial_number'
+        }, to=request.sid)
+        return
+
+    # Retirer le client de la room
+    room = f"sensor_{serial_number}"
+    leave_room(room)
+    emit('subscription_status', {
+        'status': 'unsubscribed',
+        'serial_number': serial_number,
+        'message': f'Unsubscribed from sensor data for {serial_number}'
+    }, to=request.sid)
 
 # --- Gestion erreurs ---
 @app.errorhandler(404)

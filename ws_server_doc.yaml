@@ -1,0 +1,132 @@
+openapi: 3.1.0
+info:
+  title: AR Assembly Detection – WebSocket API
+  description: |
+    API WebSocket temps réel pour le système AR Assembly Detection.
+    Permet la communication vidéo, la détection automatique de défauts et le retour de données capteurs.
+  version: 1.0.0
+
+servers:
+  - url: ws://localhost:5000
+    description: WebSocket server
+
+tags:
+  - name: WebSocket
+    description: Événements WebSocket supportés par le backend AR.
+
+paths: {}
+
+webhooks:
+  connect:
+    post:
+      summary: Connexion établie
+      tags: [WebSocket]
+      responses:
+        '200':
+          description: Confirmation de connexion
+          content:
+            application/json:
+              example:
+                status: connected
+                session_id: abc123
+
+  disconnect:
+    post:
+      summary: Déconnexion d'un client
+      tags: [WebSocket]
+      responses:
+        '200':
+          description: Déconnexion réussie
+
+  video_stream:
+    post:
+      summary: Envoi d’une frame vidéo encodée (base64)
+      tags: [WebSocket]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                frame:
+                  type: string
+                  description: Image encodée en base64
+            example:
+              frame: "<base64-image>"
+      responses:
+        '200':
+          description: Stream reçu
+          content:
+            application/json:
+              examples:
+                stream_status:
+                  summary: Statut de réception
+                  value:
+                    status: received
+                    timestamp: "2025-06-18T15:50:00Z"
+                equipment_identified:
+                  summary: Équipement détecté
+                  value:
+                    equipment:
+                      serial_number: SN-IM2025007
+                      equipment_name: Industrial Motor
+                      asset_id: A-98273
+                      part_number: PN-4288
+                      location_name: Zone 4
+                      documentation: doc.pdf
+                    qr_data:
+                      qr_code: SN-IM2025007
+
+  capture_frame:
+    post:
+      summary: Déclenche l’analyse de la dernière frame vidéo
+      tags: [WebSocket]
+      requestBody:
+        description: Aucune donnée requise
+        content:
+          application/json:
+            schema:
+              type: object
+              example: {}
+      responses:
+        '200':
+          description: Résultat de la détection
+          content:
+            application/json:
+              example:
+                timestamp: "2025-06-18T16:10:00Z"
+                equipment_id: SN-IM2025007
+                serial_number: SN-IM2025007
+                detection:
+                  anomaly_score: 0.0251
+                  status: GOOD
+                session_id: abc123
+
+  sensor_data:
+    post:
+      summary: Données capteurs transmises depuis la route REST `/sensors/:serial_number`
+      tags: [WebSocket]
+      responses:
+        '200':
+          description: Flux capteur en temps réel
+          content:
+            application/json:
+              example:
+                serial_number: SN-IM2025007
+                data:
+                  temperature: 45.1
+                  vibration: 0.27
+                  timestamp: "2025-06-18T16:00:00Z"
+
+  error:
+    post:
+      summary: Message d’erreur lors du traitement
+      tags: [WebSocket]
+      responses:
+        '200':
+          description: Erreur
+          content:
+            application/json:
+              example:
+                message: "Video processing error: failed to decode"

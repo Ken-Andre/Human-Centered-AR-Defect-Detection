@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>AR Assembly Detection Client</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+<!-- Toute la structure HTML de l’UI que tu veux, ex : -->
+<div class="container">
+    <div class="header">
+        <h1>🔧 AR Assembly Detection Client</h1>
+        <p>
+            <span id="connectionStatus" class="status-indicator status-disconnected"></span>
+            <span id="connectionText">Disconnected</span> |
+            Session: <span id="sessionId">-</span> |
+            Equipment: <span id="currentEquipment">None</span>
+        </p>
+        <div class="nav-buttons">
+            <button class="nav-btn active" onclick="showSection('dashboard', event)">Dashboard</button>
+            <button class="nav-btn" onclick="showSection('stream', event)">Stream</button>
+            <button class="nav-btn" onclick="showSection('capture', event)">Capture</button>
+            <button class="nav-btn" onclick="showSection('info', event)">Equipment Info</button>
+            <button class="nav-btn" onclick="showSection('doc', event)">Documentation</button>
+            <button class="nav-btn" onclick="showSection('sensors', event)">Sensors</button>
+            <button class="nav-btn" onclick="showSection('health', event)">Health</button>
+            <button class="nav-btn" onclick="showSection('voice', event)">Voice Control</button>
+        </div>
+    </div>
+
+    <!-- === Sections === -->
+    <div id="dashboard" class="content-section active">
+        <h2>🎯 Dashboard</h2>
+        <div class="control-panel">
+            <button class="btn btn-primary" onclick="connectWebSocket()">Connect WebSocket</button>
+            <button class="btn btn-warning" onclick="disconnectWebSocket()">Disconnect</button>
+            <button class="btn btn-success" onclick="checkHealth()">Check Health</button>
+        </div>
+        <div class="info-card">
+            <h3>Quick Actions</h3>
+            <div class="control-panel">
+                <button class="btn btn-primary" onclick="startCamera()">Start Camera</button>
+                <button class="btn btn-warning" onclick="stopCamera()">Stop Camera</button>
+                <button class="btn btn-success" onclick="captureFrame()">Capture & Analyze</button>
+            </div>
+        </div>
+        <div class="log-container" id="systemLog">
+            <div>[SYSTEM] AR Assembly Detection Client Ready</div>
+        </div>
+    </div>
+    <div id="stream" class="content-section">
+        <h2>📹 Video Stream</h2>
+        <div class="video-container">
+            <video id="videoElement" autoplay muted playsinline></video>
+            <canvas id="captureCanvas" style="display:none;"></canvas>
+        </div>
+        <div class="control-panel">
+            <button class="btn btn-primary" onclick="startCamera()">Start Camera</button>
+            <button class="btn btn-warning" onclick="stopCamera()">Stop Camera</button>
+            <button class="btn btn-success" onclick="toggleStreaming()" id="streamToggle">Start Streaming</button>
+        </div>
+        <div class="file-upload" onclick="document.getElementById('imageUpload').click()">
+            <input type="file" id="imageUpload" accept="image/*" style="display:none;" onchange="uploadImage(this)">
+            <p>📷 Click to upload an image for analysis</p>
+            <small>Or use camera stream above</small>
+        </div>
+    </div>
+    <div id="capture" class="content-section">
+        <h2>📸 Capture & Analysis</h2>
+        <div class="control-panel">
+            <button class="btn btn-success" onclick="captureFrame()" id="captureBtn">Capture Frame</button>
+            <button class="btn btn-primary" onclick="sendTestQR()">Test QR Detection</button>
+            <button class="btn btn-warning" onclick="sendTestDefect()">Test Defect Detection</button>
+        </div>
+        <div id="detectionResults" class="info-card" style="display:none;">
+            <h3>Detection Results</h3>
+            <div id="detectionContent"></div>
+        </div>
+        <div id="lastCapture" class="info-card">
+            <h3>Last Capture Status</h3>
+            <p id="captureStatus">No capture performed yet</p>
+        </div>
+    </div>
+    <div id="info" class="content-section">
+        <h2>🔧 Equipment Information</h2>
+        <div class="control-panel">
+            <input type="text" id="serialInput" placeholder="Enter serial number" style="padding:10px; border:1px solid #ddd; border-radius:5px; margin-right:10px;">
+            <button class="btn btn-primary" onclick="fetchEquipmentInfo()">Fetch Info</button>
+        </div>
+        <div id="equipmentDetails" class="equipment-info">
+            <div class="info-card">
+                <h3>Current Equipment</h3>
+                <p id="equipmentSerial">Serial: Not identified</p>
+                <p id="equipmentModel">Model: -</p>
+                <p id="equipmentStatus">Status: -</p>
+            </div>
+        </div>
+    </div>
+    <div id="doc" class="content-section">
+        <h2>📚 Equipment Documentation</h2>
+        <div class="control-panel">
+            <button class="btn btn-primary" onclick="fetchDocumentation()">Load Documentation</button>
+        </div>
+        <div id="documentationContent" class="documentation">
+            <p>No documentation loaded. Identify equipment first or enter serial number above.</p>
+        </div>
+    </div>
+    <div id="sensors" class="content-section">
+        <h2>📊 Sensor Data (Live)</h2>
+        <div class="sensor-data">
+            <div class="sensor-card">
+                <h3>Temperature</h3>
+                <div class="sensor-value" id="tempValue">--°C</div>
+                <small>Last updated: <span id="tempTime">Never</span></small>
+            </div>
+            <div class="sensor-card">
+                <h3>Vibration</h3>
+                <div class="sensor-value" id="vibrationValue">-- Hz</div>
+                <small>Last updated: <span id="vibrationTime">Never</span></small>
+            </div>
+            <div class="sensor-card">
+                <h3>Equipment Status</h3>
+                <div class="sensor-value" id="equipmentStatusValue">Unknown</div>
+                <small>Serial: <span id="sensorSerial">-</span></small>
+            </div>
+        </div>
+        <div class="info-card">
+            <h3>Sensor Log</h3>
+            <div class="log-container" id="sensorLog">
+                <div>[SENSORS] Waiting for sensor data...</div>
+            </div>
+        </div>
+    </div>
+    <div id="health" class="content-section">
+        <h2>🏥 System Health</h2>
+        <div class="control-panel">
+            <button class="btn btn-success" onclick="checkHealth()">Refresh Health Status</button>
+        </div>
+        <div id="healthStatus" class="equipment-info">
+            <div class="info-card">
+                <h3>Backend Status</h3>
+                <p id="backendStatus">Status: Unknown</p>
+                <p id="backendTime">Last check: Never</p>
+            </div>
+            <div class="info-card">
+                <h3>Database</h3>
+                <p id="dbStatus">Status: Unknown</p>
+            </div>
+            <div class="info-card">
+                <h3>AI Models</h3>
+                <p id="aiStatus">Status: Unknown</p>
+            </div>
+        </div>
+    </div>
+    <div id="voice" class="content-section">
+        <h2>🎤 Voice Control</h2>
+        <div class="voice-controls">
+            <h3>Voice Commands</h3>
+            <div class="control-panel">
+                <button class="btn btn-success" onclick="startVoiceRecognition()" id="voiceBtn">Start Listening</button>
+                <button class="btn btn-danger" onclick="stopVoiceRecognition()">Stop</button>
+            </div>
+            <div id="voiceStatus" style="margin-top:15px;">
+                <p>Status: <span id="voiceStatusText">Ready</span></p>
+                <p>Last command: <span id="lastCommand">None</span></p>
+            </div>
+        </div>
+        <div class="info-card">
+            <h3>Available Commands</h3>
+            <ul>
+                <li>"start camera" - Start video stream</li>
+                <li>"stop camera" - Stop video stream</li>
+                <li>"capture" - Take photo and analyze</li>
+                <li>"connect" - Connect to server</li>
+                <li>"disconnect" - Disconnect from server</li>
+                <li>"health check" - Check system status</li>
+            </ul>
+        </div>
+    </div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
