@@ -5,7 +5,7 @@ import threading
 import base64
 import time
 
-BACKEND_URL = "http://127.0.0.1:5000/"
+BACKEND_URL = "https://192.168.1.114:5000/"
 
 app = Flask(__name__, static_folder="./app/static", template_folder="./app/templates")
 app.secret_key = "ar_secret"

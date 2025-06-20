@@ -158,6 +158,37 @@ body {
     transform: none;
 }
 
+.tooltip-btn {
+    position: relative;
+}
+
+.tooltip-btn .tooltip-text {
+    visibility: hidden;
+    width: 220px;
+    background: #222;
+    color: #fff;
+    text-align: left;
+    border-radius: 8px;
+    padding: 10px 16px;
+    position: absolute;
+    z-index: 99;
+    bottom: 130%; /* position above button */
+    left: 50%;
+    transform: translateX(-50%);
+    opacity: 0;
+    transition: opacity .2s;
+    font-size: 14px;
+    pointer-events: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.tooltip-btn:hover .tooltip-text,
+.tooltip-btn:focus-within .tooltip-text {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+}
+
 .info-card {
     background: rgba(255, 255, 255, 0.8);
     border-radius: 10px;

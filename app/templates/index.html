@@ -32,7 +32,8 @@
 
     <!-- === Sections === -->
     <div id="dashboard" class="content-section active">
-        <h2>🎯 Dashboard</h2>
+        <h2> Dashboard</h2>
+{#        <h2>🎯 Dashboard</h2>#}
         <div class="control-panel">
             <button class="btn btn-primary" onclick="connectWebSocket()">Connect WebSocket</button>
             <button class="btn btn-warning" onclick="disconnectWebSocket()">Disconnect</button>
@@ -51,29 +52,58 @@
         </div>
     </div>
     <div id="stream" class="content-section">
-        <h2>📹 Video Stream</h2>
+        <h2> Video Stream</h2>
+{#        <h2>📹 Video Stream</h2>#}
         <div class="video-container">
             <video id="videoElement" autoplay muted playsinline></video>
             <canvas id="captureCanvas" style="display:none;"></canvas>
         </div>
         <div class="control-panel">
-            <button class="btn btn-primary" onclick="startCamera()">Start Camera</button>
-            <button class="btn btn-warning" onclick="stopCamera()">Stop Camera</button>
-            <button class="btn btn-success" onclick="toggleStreaming()" id="streamToggle">Start Streaming</button>
+    <span class="tooltip-btn">
+        <button class="btn btn-primary" onclick="startCamera()">Start Camera</button>
+        <span class="tooltip-text">
+            Active la caméra sur cet appareil, en local. Nécessaire avant tout streaming ou capture.<br>
+            <i>Starts local camera only.</i>
+        </span>
+    </span>
+            <span class="tooltip-btn">
+        <button class="btn btn-warning" onclick="stopCamera()">Stop Camera</button>
+        <span class="tooltip-text">
+            Désactive la caméra locale et arrête tout streaming en cours.<br>
+            <i>Stops camera and any streaming.</i>
+        </span>
+    </span>
+            <span class="tooltip-btn">
+        <button class="btn btn-success" onclick="toggleStreaming()" id="streamToggle">Start Streaming</button>
+        <span class="tooltip-text">
+            Lance l’envoi du flux vidéo au serveur pour la détection temps réel.<br>
+            <b>La caméra doit être démarrée !</b><br>
+            <i>Starts real-time streaming to the server.</i>
+        </span>
+    </span>
         </div>
-        <div class="file-upload" onclick="document.getElementById('imageUpload').click()">
-            <input type="file" id="imageUpload" accept="image/*" style="display:none;" onchange="uploadImage(this)">
-            <p>📷 Click to upload an image for analysis</p>
-            <small>Or use camera stream above</small>
-            <div id="detectionResults" style="display:none;">
-                <div id="detectionContent"></div>
-            </div>
+
+        <div class="file-upload">
+            <input type="file" id="imageUploadDefect" accept="image/*" style="display:none;" onchange="uploadImageDefect(this)">
+            <button class="btn btn-danger" onclick="document.getElementById('imageUploadDefect').click()">Uploader image (Défaut uniquement)</button>
+
+            <input type="file" id="imageUploadQR" accept="image/*" style="display:none;" onchange="uploadImageQR(this)">
+            <button class="btn btn-info" onclick="document.getElementById('imageUploadQR').click()">Uploader image (QR code uniquement)</button>
         </div>
+
     </div>
     <div id="capture" class="content-section">
-        <h2>📸 Capture & Analysis</h2>
+        <h2> Capture & Analysis</h2>
+{#        <h2>📸 Capture & Analysis</h2>#}
         <div class="control-panel">
-            <button class="btn btn-success" onclick="captureFrame()" id="captureBtn">Capture Frame</button>
+            <span class="tooltip-btn">
+                <button class="btn btn-success" onclick="captureFrame()" id="captureBtn">Capture Frame</button>
+                <span class="tooltip-text">
+                    Capture et analyse instantanément une frame vidéo.<br>
+                    <i>Capture and analyze current video frame.</i>
+                </span>
+            </span>
+{#            <button class="btn btn-success" onclick="captureFrame()" id="captureBtn">Capture Frame</button>#}
             <button class="btn btn-primary" onclick="sendTestQR()">Test QR Detection</button>
             <button class="btn btn-warning" onclick="sendTestDefect()">Test Defect Detection</button>
         </div>
@@ -102,6 +132,7 @@
         </div>
     </div>
     <div id="doc" class="content-section">
+        <h2> Equipment Documentation</h2>
         <h2>📚 Equipment Documentation</h2>
         <div class="control-panel">
             <button class="btn btn-primary" onclick="fetchDocumentation()">Load Documentation</button>
@@ -111,7 +142,8 @@
         </div>
     </div>
     <div id="sensors" class="content-section">
-        <h2>📊 Sensor Data (Live)</h2>
+        <h2> Sensor Data (Live)</h2>
+{#        <h2>📊 Sensor Data (Live)</h2>#}
         <div class="sensor-data">
             <div class="sensor-card">
                 <h3>Temperature</h3>
@@ -137,7 +169,8 @@
         </div>
     </div>
     <div id="health" class="content-section">
-        <h2>🏥 System Health</h2>
+        <h2> System Health</h2>
+{#        <h2>🏥 System Health</h2>#}
         <div class="control-panel">
             <button class="btn btn-success" onclick="checkHealth()">Refresh Health Status</button>
         </div>

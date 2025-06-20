@@ -1,4 +1,4 @@
-BACKEND_URL = 'http://127.0.0.1:5000';
+BACKEND_URL = 'https://192.168.1.114:5000';
 const appState = {
     connected: false,
     sessionId: null,
@@ -117,7 +117,8 @@ function connectWebSocket() {
         updateStatusUI();
         addLog('WebSocket disconnected', 'WARN');
         showAlert('WebSocket déconnecté du serveur !');
-        autoReconnectWebSocket(5000); // Reconnexion après 5 sec
+        autoReconnectWebSocket(5000);
+        resetSensorUI();
     });
 
 
@@ -184,13 +185,31 @@ function updateStatusUI() {
             sessionEl.textContent = '-';
         }
     }
-    const equipEl = document.getElementById('currentEquipment');
-    if (equipEl) equipEl.textContent = appState.equipment?.serial_number || 'None';
     const captureBtn = document.getElementById('captureBtn');
     if (captureBtn) captureBtn.disabled = !appState.connected;
     const streamBtn = document.getElementById('streamToggle');
     if (streamBtn) streamBtn.disabled = !appState.connected || !appState.videoStream;
+    const stopCameraBtn = document.getElementById('stopCameraBtn');
+    if (stopCameraBtn) stopCameraBtn.disabled = !appState.videoStream;
+    const equipEl = document.getElementById('currentEquipment');
+    if (equipEl) equipEl.textContent = appState.equipment?.serial_number || 'None';
+    // const captureBtn = document.getElementById('captureBtn');
+    // if (captureBtn) captureBtn.disabled = !appState.connected;
+    // const streamBtn = document.getElementById('streamToggle');
+    // if (streamBtn) streamBtn.disabled = !appState.connected || !appState.videoStream;
 
+}
+
+function updateStreamingUI() {
+    const videoEl = document.getElementById('videoElement');
+    if (!videoEl) return;
+    if (appState.isStreaming) {
+        videoEl.style.boxShadow = '0 0 30px 5px #45a049';
+        videoEl.setAttribute('data-streaming', 'on');
+    } else {
+        videoEl.style.boxShadow = '0 4px 20px rgba(0,0,0,0.2)';
+        videoEl.setAttribute('data-streaming', 'off');
+    }
 }
 
 // Camera / Streaming
@@ -239,6 +258,7 @@ function toggleStreaming() {
         }
         addLog('Video streaming started');
         streamVideo();
+        updateStreamingUI();
     }
 }
 
@@ -273,37 +293,64 @@ function captureFrame() {
 }
 
 // Upload image REST (QR + Defect)
-function uploadImage(input) {
+// function uploadImage(input) {
+//     const file = input.files[0];
+//     if (!file) return;
+//     const formData = new FormData();
+//     formData.append('image', file);
+//
+//     if (!file.type.startsWith('image/')) {
+//         addLog('Format invalide. Fichier non image.', 'ERROR');
+//         showAlert('Format de fichier non supporté (image attendue)');
+//         return;
+//     }
+//
+//     // QR detection
+//     // Détection QR
+//     fetch(`${BACKEND_URL}/detect_qrcode`, {method: 'POST', body: formData})
+//         .then(r => r.json())
+//         .then(data => {
+//             if (data.error) {
+//                 addLog(`Erreur détection QR: ${data.error}`, 'ERROR');
+//                 showAlert(`Erreur QR: ${data.error}`);
+//             } else {
+//                 addLog(`QR Detection result: ${JSON.stringify(data)}`);
+//                 displayDetectionResult({detection: data, type: 'qr'});
+//             }
+//         })
+//         .catch(e => {
+//             addLog(`QR Detection error: ${e.message}`, 'ERROR');
+//             showAlert(`Erreur réseau (QR): ${e.message}`);
+//         });
+//
+//     // Détection Défaut
+//     fetch(`${BACKEND_URL}/detect_defect`, {method: 'POST', body: formData})
+//         .then(r => r.json())
+//         .then(data => {
+//             if (data.error) {
+//                 addLog(`Erreur détection défaut: ${data.error}`, 'ERROR');
+//                 showAlert(`Erreur défaut: ${data.error}`);
+//             } else {
+//                 addLog(`Defect Detection result: ${JSON.stringify(data)}`);
+//                 displayDetectionResult({detection: data, type: 'defect'});
+//             }
+//         })
+//         .catch(e => {
+//             addLog(`Defect Detection error: ${e.message}`, 'ERROR');
+//             showAlert(`Erreur réseau (défaut): ${e.message}`);
+//         });
+//     addLog(`Image uploaded: ${file.name}`);
+// }
+function uploadImageDefect(input) {
     const file = input.files[0];
     if (!file) return;
-    const formData = new FormData();
-    formData.append('image', file);
-
     if (!file.type.startsWith('image/')) {
-        addLog('Format invalide. Fichier non image.', 'ERROR');
         showAlert('Format de fichier non supporté (image attendue)');
         return;
     }
+    const formData = new FormData();
+    formData.append('image', file);
 
-    // QR detection
-    // Détection QR
-    fetch(`${BACKEND_URL}/detect_qrcode`, {method: 'POST', body: formData})
-        .then(r => r.json())
-        .then(data => {
-            if (data.error) {
-                addLog(`Erreur détection QR: ${data.error}`, 'ERROR');
-                showAlert(`Erreur QR: ${data.error}`);
-            } else {
-                addLog(`QR Detection result: ${JSON.stringify(data)}`);
-                displayDetectionResult({detection: data, type: 'qr'});
-            }
-        })
-        .catch(e => {
-            addLog(`QR Detection error: ${e.message}`, 'ERROR');
-            showAlert(`Erreur réseau (QR): ${e.message}`);
-        });
-
-    // Détection Défaut
     fetch(`${BACKEND_URL}/detect_defect`, {method: 'POST', body: formData})
         .then(r => r.json())
         .then(data => {
@@ -319,8 +366,48 @@ function uploadImage(input) {
             addLog(`Defect Detection error: ${e.message}`, 'ERROR');
             showAlert(`Erreur réseau (défaut): ${e.message}`);
         });
-    addLog(`Image uploaded: ${file.name}`);
 }
+function uploadImageQR(input) {
+    const file = input.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+        showAlert('Format de fichier non supporté (image attendue)');
+        return;
+    }
+    const formData = new FormData();
+    formData.append('image', file);
+
+    fetch(`${BACKEND_URL}/detect_qrcode`, {method: 'POST', body: formData})
+        .then(r => r.json())
+        .then(async data => {
+            if (data.error) {
+                addLog(`Erreur détection QR: ${data.error}`, 'ERROR');
+                showAlert(`Erreur QR: ${data.error}`);
+            } else {
+                addLog(`QR Detection result: ${JSON.stringify(data)}`);
+                displayDetectionResult({detection: data, type: 'qr'});
+                // -- CHECK si le QR existe dans la BDD, sinon affiche erreur --
+                if (data.qr_code) {
+                    // On va chercher l'équipement via l'API, comme dans fetchEquipmentInfo
+                    let resp = await fetch(`${BACKEND_URL}/equipment/${data.qr_code}`);
+                    let equip = await resp.json();
+                    if (equip && !equip.error) {
+                        addLog(`Équipement trouvé pour QR: ${equip.serial_number}`);
+                        appState.equipment = equip;
+                        updateEquipmentDisplay(equip);
+                        showAlert(`Équipement détecté et chargé: ${equip.serial_number}`, 4000);
+                    } else {
+                        showAlert("QR détecté, mais équipement inconnu dans la base !");
+                    }
+                }
+            }
+        })
+        .catch(e => {
+            addLog(`QR Detection error: ${e.message}`, 'ERROR');
+            showAlert(`Erreur réseau (QR): ${e.message}`);
+        });
+}
+
 
 function sendTestQR() {
     document.getElementById('imageUpload').click();

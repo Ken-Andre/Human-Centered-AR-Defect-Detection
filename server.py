@@ -308,10 +308,10 @@ def initialize_server():
 if __name__ == '__main__':
     # threading.Thread(target=hot_reload_listener, daemon=True).start()
     if initialize_server():
-        logger.info("Starting AR Assembly Detection Server...")
+        logger.info("Starting AR Assembly Detection Server (HTTPS enabled)...")
         logger.info("Server endpoints:")
-        logger.info("  - Main server: http://0.0.0.0:5000")
-        logger.info("  - WebSocket: ws://0.0.0.0:5000")
+        logger.info("  - Main server: https://0.0.0.0:5000")
+        logger.info("  - WebSocket: wss://0.0.0.0:5000")
         logger.info("  - Sensor data: POST /sensors/<serial_number>")
         logger.info("  - Equipment info: GET /equipment/<serial_number>")
         logger.info("  - Health check: GET /health")
@@ -322,8 +322,10 @@ if __name__ == '__main__':
             port=5000,
             debug=False,
             use_reloader=False,
-            log_output=True
+            log_output=True,
+            ssl_context=('cert.pem', 'key.pem')
         )
     else:
         logger.error("Server initialization failed. Exiting...")
         exit(1)
+

@@ -13,11 +13,14 @@ from datetime import datetime
 import threading
 from flask import Flask, jsonify
 import requests
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 
 # ------------- Configuration & Argument Parsing -----------------
 parser = argparse.ArgumentParser()
 parser.add_argument("-id", "--serial_number", required=True, help="Numéro de série/ID unique du module (ex : SN-IM2025001)")
-parser.add_argument("-api", "--api_url", default="http://127.0.0.1:5000", help="Adresse du serveur principal (par défaut: http://127.0.0.1:5000)")
+parser.add_argument("-api", "--api_url", default="https://127.0.0.1:5000", help="Adresse du serveur principal (par défaut: http://127.0.0.1:5000)")
 parser.add_argument("-port", "--port", type=int, default=8081, help="Port local d'écoute (par défaut: 8081)")
 args = parser.parse_args()
 
@@ -45,8 +48,15 @@ def get_data():
     return jsonify({"serial_number": SERIAL_NUMBER, "data": latest_data})
 
 def run_local_server():
-    print(f"[ESP32_SIM] Serveur local sur http://0.0.0.0:{LOCAL_PORT}{LOCAL_ROUTE}")
-    app.run(host="0.0.0.0", port=LOCAL_PORT, debug=False, use_reloader=False)
+    print(f"[ESP32_SIM] Serveur local sur https://0.0.0.0:{LOCAL_PORT}{LOCAL_ROUTE}")
+    app.run(
+        host="0.0.0.0",
+        port=LOCAL_PORT,
+        debug=False,
+        use_reloader=False,
+        ssl_context=('cert.pem', 'key.pem')
+    )
+
 
 # ------------- Thread d'envoi périodique ------------------------
 def send_to_api():
@@ -59,7 +69,7 @@ def send_to_api():
             data = generate_sensor_data()
             latest_data = data
             # POST vers le serveur principal (API AR Assembly Detection)
-            r = session.post(target_url, json=data, timeout=3)
+            r = session.post(target_url, json=data, timeout=3, verify=False)
             if r.status_code == 200:
                 print(f"[ESP32_SIM] Sent: {data} | Réponse API: {r.json().get('status','?')}")
             else:
