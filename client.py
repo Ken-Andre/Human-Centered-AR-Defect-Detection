@@ -5,7 +5,7 @@ import threading
 import base64
 import time
 
-BACKEND_URL = "http://127.0.0.1:5000"
+BACKEND_URL = "http://127.0.0.1:5000/"
 
 app = Flask(__name__, static_folder="./app/static", template_folder="./app/templates")
 app.secret_key = "ar_secret"
@@ -131,4 +131,5 @@ def voice():
     """)
 
 if __name__ == "__main__":
-    app.run(port=5050, debug=True)
+    app.run(host='0.0.0.0', port=5050, debug=True, ssl_context=('cert.pem', 'key.pem'))
+

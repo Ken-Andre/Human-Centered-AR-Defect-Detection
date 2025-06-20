@@ -22,11 +22,13 @@ import os
 
 from sudo_detection import DetectionManager
 from db import *
+from flask_cors import CORS
 
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+CORS(app)
 app.config['SECRET_KEY'] = 'ar_assembly_detection_2025'
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 

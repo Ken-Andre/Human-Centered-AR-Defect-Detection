@@ -1,10 +1,11 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>AR Assembly Detection Client</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script  src="{{ url_for('static', filename='js/socket.io.js') }}"></script>
 </head>
 <body>
 <!-- Toute la structure HTML de l’UI que tu veux, ex : -->
@@ -64,6 +65,9 @@
             <input type="file" id="imageUpload" accept="image/*" style="display:none;" onchange="uploadImage(this)">
             <p>📷 Click to upload an image for analysis</p>
             <small>Or use camera stream above</small>
+            <div id="detectionResults" style="display:none;">
+                <div id="detectionContent"></div>
+            </div>
         </div>
     </div>
     <div id="capture" class="content-section">
@@ -156,7 +160,7 @@
     <div id="voice" class="content-section">
         <h2>🎤 Voice Control</h2>
         <div class="voice-controls">
-            <h3>Voice Commands</h3>
+            <h3>Voice Commands (EN/FR)</h3>
             <div class="control-panel">
                 <button class="btn btn-success" onclick="startVoiceRecognition()" id="voiceBtn">Start Listening</button>
                 <button class="btn btn-danger" onclick="stopVoiceRecognition()">Stop</button>
@@ -169,17 +173,60 @@
         <div class="info-card">
             <h3>Available Commands</h3>
             <ul>
-                <li>"start camera" - Start video stream</li>
-                <li>"stop camera" - Stop video stream</li>
-                <li>"capture" - Take photo and analyze</li>
-                <li>"connect" - Connect to server</li>
-                <li>"disconnect" - Disconnect from server</li>
-                <li>"health check" - Check system status</li>
+                <li><strong>Show/Hide sections:</strong>
+                    <ul>
+                        <li>"show sensors" / "afficher données capteur"</li>
+                        <li>"show documentation" / "afficher documentation"</li>
+                        <li>"close documentation", "go home", "dashboard" / "fermer documentation", "retour accueil", "aller accueil"</li>
+                    </ul>
+                </li>
+                <li><strong>Anomaly/Defect Detection:</strong>
+                    <ul>
+                        <li>"detect defect", "detect anomaly" / "détecter anomalie", "détecter défaut"</li>
+                    </ul>
+                </li>
+                <li><strong>Streaming & Camera:</strong>
+                    <ul>
+                        <li>"start camera" / "démarrer caméra"</li>
+                        <li>"stop camera" / "arrêter caméra"</li>
+                        <li>"start streaming" / "démarrer streaming"</li>
+                        <li>"stop streaming" / "arrêter streaming"</li>
+                    </ul>
+                </li>
+                <li><strong>Frame/Photo:</strong>
+                    <ul>
+                        <li>"capture" / "capturer"</li>
+                    </ul>
+                </li>
+                <li><strong>Equipment & Info:</strong>
+                    <ul>
+                        <li>"fetch info", "show equipment" / "info équipement"</li>
+                    </ul>
+                </li>
+                <li><strong>Health & Connection:</strong>
+                    <ul>
+                        <li>"connect" / "connecter"</li>
+                        <li>"disconnect" / "déconnecter"</li>
+                        <li>"health check", "check health" / "état système", "vérifier état"</li>
+                    </ul>
+                </li>
+                <li><strong>Navigation:</strong>
+                    <ul>
+                        <li>"dashboard", "go home" / "accueil", "retour accueil"</li>
+                        <li>"stream", "video" / "stream"</li>
+                        <li>"voice", "commande vocale"</li>
+                    </ul>
+                </li>
             </ul>
+            <p style="margin-top:10px;color:#333;">
+                <small>Tip : All commands are available both in English and French.<br>
+                    Say for example : <em>"afficher documentation"</em> or <em>"show documentation"</em>.</small>
+            </p>
         </div>
     </div>
+
 </div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+{#<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>#}
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>
